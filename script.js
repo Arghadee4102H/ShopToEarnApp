@@ -6,12 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Firebase Configuration ---
     // IMPORTANT: Replace with your Firebase project's configuration
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID",
+        apiKey: "AIzaSyDdeaYdsqA-CWRy0cUaLDlAYG5cObChZRU",
+        authDomain: "shoptoearnapp-23ad9.firebaseapp.com",
+        projectId: "shoptoearnapp-23ad9",
+        storageBucket: "shoptoearnapp-23ad9.firebasestorage.app",
+        messagingSenderId: "432819509435",
+        appId: "1:432819509435:web:8bbc7e24f6b27e04e8719e",
         measurementId: "YOUR_MEASUREMENT_ID" // Optional
     };
 
