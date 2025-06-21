@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Shop to Earn</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <!-- Add Firestore SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <!-- Add Auth SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+</head>
+<body>
+    <div id="app-loader" class="app-loader">
+        <div class="loader-text">Shop to Earn</div>
+        <div class="spinner"></div>
+        <p>Connecting to the mothership...</p>
+    </div>
+
+    <div id="app-container" class="app-container" style="display: none;">
+        <!-- Sections: Only one visible at a time -->
+        <main id="main-content">
+            <!-- Profile Section -->
+            <section id="profile" class="section active">
+                <div class="section-header">
+                    <h2>👤 Your Profile</h2>
+                </div>
+                <div class="profile-details card">
+                    <p><strong>Username:</strong> <span id="profile-username">Loading...</span></p>
+                    <p><strong>Telegram ID:</strong> <span id="profile-tg-id">Loading...</span></p>
+                    <p class="coming-soon"><strong>Email:</strong> <span id="profile-email">N/A</span></p>
+                    <hr class="glow-divider">
+                    <p><strong>Links Created:</strong> <span id="profile-links-created">0</span></p>
+                    <p><strong>Successful Orders:</strong> <span id="profile-successful-orders">0</span></p>
+                    <p><strong>Pending Orders:</strong> <span id="profile-pending-orders">0</span></p>
+                    <hr class="glow-divider">
+                    <p class="points-display"><strong>Total Earned Points:</strong> <span id="profile-total-points">0</span> ✨</p>
+                </div>
+                <button id="withdraw-points-btn" class="btn btn-primary glow-on-hover">Withdraw Points</button>
+                <div id="withdraw-modal" class="modal">
+                    <div class="modal-content">
+                        <span class="close-button">&times;</span>
+                        <h3>Withdraw Points</h3>
+                        <p>Current Points: <span id="modal-current-points">0</span></p>
+                        <input type="number" id="withdraw-amount" placeholder="Points to withdraw" min="1">
+                        <select id="withdraw-method">
+                            <option value="">Select Withdrawal Method</option>
+                            <option value="Binance">Binance</option>
+                            <option value="UPI">UPI</option>
+                            <!-- Add more methods as needed -->
+                        </select>
+                        <input type="text" id="withdraw-details" placeholder="Binance ID / UPI ID">
+                        <button id="submit-withdrawal-btn" class="btn btn-primary">Submit Request</button>
+                        <p id="withdraw-message" class="message"></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Shop Section -->
+            <section id="shop" class="section">
+                <div class="section-header">
+                    <h2>🛍️ Create Magic Link</h2>
+                </div>
+                <div class="shop-content card">
+                    <p>Paste a product URL from Amazon, Flipkart, Myntra, Ajio, Shopsy, or Nykaa.</p>
+                    <input type="url" id="product-url-input" placeholder="https://www.example.com/product-page">
+                    <button id="generate-link-btn" class="btn btn-primary glow-on-hover">Generate Link</button>
+                    <div id="link-generation-message" class="message" style="display:none;"></div>
+                    <div id="generated-link-card" class="card generated-link-container" style="display:none;">
+                        <h4>Your Affiliate Link:</h4>
+                        <div class="link-display-wrapper">
+                            <input type="text" id="generated-link-output" readonly>
+                            <button id="copy-link-btn" class="btn btn-secondary">📋 Copy</button>
+                        </div>
+                        <p class="info-text">💡 Tracking and commission confirmation within 72 hours.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Shopping Evidence Section -->
+            <section id="evidence" class="section">
+                <div class="section-header">
+                    <h2>🕵️ Submit Shopping Proof</h2>
+                </div>
+                <div class="evidence-content card">
+                    <h4>Quick Order ID Submission:</h4>
+                    <p>Don't have time for the full form now? Submit your Order ID quickly.</p>
+                    <input type="text" id="quick-order-id" placeholder="Enter Order ID">
+                    <button id="submit-quick-order-id-btn" class="btn btn-primary glow-on-hover">Submit Order ID</button>
+                    <div id="quick-submit-message" class="message" style="display:none;"></div>
+                    <hr class="glow-divider">
+                    <h4>Full Proof Submission (Recommended):</h4>
+                    <p>For complete processing of your reward, please fill out our detailed Google Form.</p>
+                    <p>Copy the link below and paste it into your browser:</p>
+                    <div class="link-display-wrapper">
+                        <input type="text" id="google-form-link" value="https://forms.gle/k3iLW2PusKfjh2o97" readonly>
+                        <button id="copy-gform-link-btn" class="btn btn-secondary">📋 Copy Form Link</button>
+                    </div>
+                     <div id="copy-gform-message" class="message" style="display:none;"></div>
+                    <hr class="glow-divider">
+                    <h4>Stay Updated!</h4>
+                    <p>Join our Telegram channel for the latest news, offers, and support:</p>
+                    <a href="https://t.me/ShopEarnHub4102h" target="_blank" class="btn btn-secondary btn-full-width">
+                        <img src="https://telegram.org/img/favicon.ico" alt="Telegram" class="channel-icon"/> Join ShopEarnHub Channel
+                    </a>
+                </div>
+            </section>
+
+            <!-- Transactions Section -->
+            <section id="transactions" class="section">
+                <div class="section-header">
+                    <h2>🔄 Your Activity</h2>
+                </div>
+                <div class="transactions-content">
+                    <p class="info-text">Track all your submitted orders, generated links, points earned, and status updates here. Points are added after admin verification.</p>
+                    <div class="filter-controls">
+                        <label for="status-filter">Filter by status:</label>
+                        <select id="status-filter">
+                            <option value="all">All</option>
+                            <option value="pending">Pending</option>
+                            <option value="successful">Successful</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div id="transactions-list" class="transactions-list">
+                        <!-- Transactions will be loaded here by JavaScript -->
+                        <p>No transactions yet. Start shopping or generating links!</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Navigation Bar -->
+        <nav id="bottom-nav">
+            <button class="nav-btn active" data-section="profile">👤<span class="nav-text">Profile</span></button>
+            <button class="nav-btn" data-section="shop">🛍️<span class="nav-text">Shop</span></button>
+            <button class="nav-btn" data-section="evidence">🕵️<span class="nav-text">Evidence</span></button>
+            <button class="nav-btn" data-section="transactions">🔄<span class="nav-text">Activity</span></button>
+        </nav>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
