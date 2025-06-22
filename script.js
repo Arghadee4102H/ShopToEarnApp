@@ -144,14 +144,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Critical Error during app initialization:", error);
             let userErrorMessage = "App initialization failed. Please try again.";
-            if (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("firebase project not found")) {
+            if (error.message && (error.message.toLowerCase().includes("permission-denied") || error.message.toLowerCase().includes("insufficient permissions"))) {
+                userErrorMessage = "Database Permission Error.<br>Please check your Firebase Firestore 'Rules' tab. For development, you might need to allow read/write access.";
+            } else if (error.message && (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("firebase project not found"))) {
                 userErrorMessage = "Firebase Configuration Error.<br>Please check your API keys and Project ID in the script.";
-            } else if (error.message.toLowerCase().includes("firestore") || error.message.toLowerCase().includes("database")) {
+            } else if (error.message && (error.message.toLowerCase().includes("firestore") || error.message.toLowerCase().includes("database"))) {
                 userErrorMessage = "Database Connection Error.<br>Check Firestore setup or network.";
-            } else if (error.message.toLowerCase().includes("network request failed")) {
+            } else if (error.message && error.message.toLowerCase().includes("network request failed")) {
                 userErrorMessage = "Network Error.<br>Please check your internet connection and try again.";
-            } else {
+            } else if (error.message) {
                 userErrorMessage = `An unexpected error occurred: ${error.message}.<br>Try refreshing.`;
+            } else {
+                 userErrorMessage = `An unknown error occurred.<br>Try refreshing.`;
             }
             updateLoaderMessage(userErrorMessage, true);
             tg.HapticFeedback.notificationOccurred('error');
@@ -196,18 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("loadProfileData: currentUser or ID missing, skipping.");
             return;
         }
-        // It's good practice to fetch fresh data if needed, or use existing `currentUser`
-        // For simplicity, we'll mostly use the `currentUser` object loaded at init
-        // and update it upon specific actions.
-        // A fresh fetch can be added here if stale data becomes an issue.
-        // const userRef = db.collection('users').doc(currentUser.telegram_user_id);
-        // const doc = await userRef.get();
-        // if (doc.exists) currentUser = doc.data(); else { console.error("User doc not found in loadProfileData"); return; }
-
-
         profileUsername.textContent = currentUser.telegram_username || 'N/A';
         profileTgId.textContent = currentUser.telegram_user_id;
-        // profileEmail.textContent = currentUser.email || 'Not set';
         profileLinksCreated.textContent = currentUser.links_created_count || 0;
         profileSuccessfulOrders.textContent = currentUser.successful_orders_count || 0;
         profilePendingOrders.textContent = currentUser.pending_orders_count || 0;
@@ -220,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
              showAlert("Profile data not loaded yet. Please wait.", "error", tg); return;
         }
         if (currentUser.total_points > 0) {
-            modalCurrentPoints.textContent = currentUser.total_points || 0; // Ensure modal has latest
+            modalCurrentPoints.textContent = currentUser.total_points || 0; 
             withdrawAmountInput.max = currentUser.total_points;
             withdrawAmountInput.value = '';
             withdrawDetailsInput.value = '';
@@ -277,11 +271,11 @@ document.addEventListener('DOMContentLoaded', () => {
             await db.collection('users').doc(currentUser.telegram_user_id).update({
                 total_points: firebase.firestore.FieldValue.increment(-points)
             });
-            currentUser.total_points -= points; // Update local state
+            currentUser.total_points -= points; 
 
             showWithdrawMessage("Withdrawal request submitted! It will be processed soon.", "success");
             tg.HapticFeedback.notificationOccurred('success');
-            loadProfileData(); // Refresh points on profile and modal
+            loadProfileData(); 
             setTimeout(() => {
                 withdrawModal.style.display = 'none';
             }, 2000);
@@ -333,7 +327,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (/(nykaa\.com)/i.test(originalUrl)) platform = 'Nykaa';
                 else platform = 'EarnKaro_Other';
 
-                // Ensure EARNKARO_API_ENDPOINT is correctly set and accessible
                 if (!EARNKARO_API_ENDPOINT) throw new Error("EarnKaro API endpoint not configured.");
 
                 const response = await fetch(EARNKARO_API_ENDPOINT, {
@@ -390,13 +383,13 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedLinkOutput.select();
         try {
             document.execCommand('copy');
-            showLinkGenerationMessage("Link copied!", "success"); // Shorter message
+            showLinkGenerationMessage("Link copied!", "success"); 
             tg.HapticFeedback.impactOccurred('medium');
         } catch (err) {
             showLinkGenerationMessage("Copy failed. Please copy manually.", "error");
         }
         setTimeout(() => {
-            if (linkGenerationMessage.classList.contains('success')) { // Only hide success messages quickly
+            if (linkGenerationMessage.classList.contains('success')) { 
                  linkGenerationMessage.style.display = 'none';
                  linkGenerationMessage.textContent = '';
             }
@@ -487,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const linksQuery = db.collection('generated_links')
                 .where('telegram_user_id', '==', currentUser.telegram_user_id)
-                .orderBy('timestamp', 'desc').limit(50); // Limit for performance
+                .orderBy('timestamp', 'desc').limit(50); 
             const linksSnapshot = await linksQuery.get();
             linksSnapshot.forEach(doc => {
                 const data = doc.data();
@@ -499,13 +492,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
 
-            // For proofs, Firestore doesn't allow filtering by one field and ordering by another if not composite indexed
-            // So, we fetch all for user and filter client-side, or filter by status server-side if no other order is critical
             let proofsQuery = db.collection('order_proofs')
                 .where('telegram_user_id', '==', currentUser.telegram_user_id);
-            // If filtering by status (and not 'all'), apply it to the query
             if (selectedStatus !== 'all') {
-                proofsQuery = proofsQuery.where('status', '==', selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)); // Capitalize: Pending, Successful etc.
+                proofsQuery = proofsQuery.where('status', '==', selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)); 
             }
              proofsQuery = proofsQuery.orderBy('timestamp', 'desc').limit(50);
 
@@ -563,14 +553,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Utility Functions ---
     function showAlert(message, type = 'info', tgInstance = null) {
-        // This is a placeholder. For a real app, use a styled toast/modal.
-        // For now, it updates the linkGenerationMessage if it's on the shop page,
-        // or a generic message if one existed, or falls back to alert.
         const activeSection = document.querySelector('.section.active');
         let msgDiv = null;
         if (activeSection && activeSection.id === 'shop') msgDiv = linkGenerationMessage;
-        // else if (activeSection && activeSection.id === 'profile') msgDiv = someProfileMessageDiv; // if you add one
-
+        
         if (msgDiv) {
             msgDiv.textContent = message;
             msgDiv.className = `message ${type}`;
