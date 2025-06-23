@@ -16,9 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
         measurementId: "YOUR_MEASUREMENT_ID" // Optional
     };
 
-    // Global Firebase instances - will be initialized in initializeApp
+    // Global Firebase instances
     let db;
-    let auth; // Though not used for TWA login, good practice
+    let auth;
 
     // --- Global State & Elements ---
     let currentUser = null;
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Profile Elements
     const profileUsername = document.getElementById('profile-username');
     const profileTgId = document.getElementById('profile-tg-id');
-    const profileEmail = document.getElementById('profile-email');
+    // const profileEmail = document.getElementById('profile-email'); // Not used for now
     const profileLinksCreated = document.getElementById('profile-links-created');
     const profileSuccessfulOrders = document.getElementById('profile-successful-orders');
     const profilePendingOrders = document.getElementById('profile-pending-orders');
@@ -70,7 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const AMAZON_AFFILIATE_TAG = 'arghade4102h-21';
     const EARNKARO_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2ODJjODJkNmEyMzdmM2FjYWY5Y2U5NjYiLCJlYXJua2FybyI6IjQzMTEwNjgiLCJpYXQiOjE3NTAzMDc3OTV9.6FTfh5HTXzHeGGs5wtcBXA7tBwBzAjsrwzj0zycAaOc';
-    const EARNKARO_API_ENDPOINT = 'https://api.earnkaro.com/api/v1/links'; // VERIFY THIS!
+    // THIS IS STILL A GUESS - YOU MUST VERIFY WITH EARNKARO DOCUMENTATION
+    const EARNKARO_API_ENDPOINT = 'https://api.earnkaro.com/api/v1/links';
 
     function updateLoaderMessage(message, isError = false) {
         if (appLoader) {
@@ -91,9 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLoaderMessage("Initializing Firebase...");
             if (!firebase.apps.length) {
                 firebase.initializeApp(firebaseConfig);
-                console.log("Firebase initialized.");
-            } else {
-                console.log("Firebase already initialized.");
             }
             db = firebase.firestore();
             auth = firebase.auth();
@@ -101,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLoaderMessage("Connecting to Telegram...");
             if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                 currentTelegramUser = tg.initDataUnsafe.user;
-                console.log("Telegram User Data:", currentTelegramUser);
 
                 updateLoaderMessage("Fetching your profile...");
                 const userRef = db.collection('users').doc(String(currentTelegramUser.id));
@@ -114,48 +111,37 @@ document.addEventListener('DOMContentLoaded', () => {
                         telegram_username: currentTelegramUser.username || `user_${currentTelegramUser.id}`,
                         first_name: currentTelegramUser.first_name || '',
                         last_name: currentTelegramUser.last_name || '',
-                        total_points: 0,
-                        links_created_count: 0,
-                        successful_orders_count: 0,
-                        pending_orders_count: 0,
+                        total_points: 0, links_created_count: 0,
+                        successful_orders_count: 0, pending_orders_count: 0,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     };
                     await userRef.set(currentUser);
-                    console.log("Profile created:", currentUser);
                 } else {
                     currentUser = userDoc.data();
-                    console.log("Existing user profile loaded:", currentUser);
                 }
                 
                 updateLoaderMessage("Loading app sections...");
-                await loadProfileData(); // Ensure profile data is loaded before hiding loader
+                await loadProfileData();
 
                 appLoader.style.display = 'none';
                 appContainer.style.display = 'block';
-                switchSection('profile'); // Show profile section by default
+                switchSection('profile');
                 tg.HapticFeedback.notificationOccurred('success');
 
             } else {
-                const noTgDataMsg = "Telegram user data not found.<br>Please open this app through your bot's menu button in Telegram.";
-                updateLoaderMessage(noTgDataMsg, true);
-                console.error("Telegram user data not available.");
+                updateLoaderMessage("Telegram user data not found.<br>Please open via bot's menu.", true);
                 tg.HapticFeedback.notificationOccurred('error');
             }
         } catch (error) {
-            console.error("Critical Error during app initialization:", error);
             let userErrorMessage = "App initialization failed. Please try again.";
-            if (error.message && (error.message.toLowerCase().includes("permission-denied") || error.message.toLowerCase().includes("insufficient permissions"))) {
-                userErrorMessage = "Database Permission Error.<br>Please check your Firebase Firestore 'Rules' tab. For development, you might need to allow read/write access.";
-            } else if (error.message && (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("firebase project not found"))) {
-                userErrorMessage = "Firebase Configuration Error.<br>Please check your API keys and Project ID in the script.";
-            } else if (error.message && (error.message.toLowerCase().includes("firestore") || error.message.toLowerCase().includes("database"))) {
-                userErrorMessage = "Database Connection Error.<br>Check Firestore setup or network.";
-            } else if (error.message && error.message.toLowerCase().includes("network request failed")) {
-                userErrorMessage = "Network Error.<br>Please check your internet connection and try again.";
-            } else if (error.message) {
-                userErrorMessage = `An unexpected error occurred: ${error.message}.<br>Try refreshing.`;
-            } else {
-                 userErrorMessage = `An unknown error occurred.<br>Try refreshing.`;
+            if (error.message) {
+                if (error.message.toLowerCase().includes("permission-denied") || error.message.toLowerCase().includes("insufficient permissions")) {
+                    userErrorMessage = "Database Permission Error.<br>Check Firebase Firestore 'Rules'.";
+                } else if (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("firebase project not found")) {
+                    userErrorMessage = "Firebase Configuration Error.<br>Check API keys/Project ID.";
+                } else {
+                    userErrorMessage = `An unexpected error occurred: ${error.message}.<br>Try refreshing.`;
+                }
             }
             updateLoaderMessage(userErrorMessage, true);
             tg.HapticFeedback.notificationOccurred('error');
@@ -164,18 +150,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Navigation ---
     function switchSection(targetSectionId) {
-        sections.forEach(section => {
-            section.classList.remove('active');
-            if (section.id === targetSectionId) {
-                section.classList.add('active');
-            }
-        });
-        navButtons.forEach(button => {
-            button.classList.remove('active');
-            if (button.dataset.section === targetSectionId) {
-                button.classList.add('active');
-            }
-        });
+        sections.forEach(section => section.classList.remove('active'));
+        const activeSection = document.getElementById(targetSectionId);
+        if (activeSection) activeSection.classList.add('active');
+
+        navButtons.forEach(button => button.classList.remove('active'));
+        const activeButton = document.querySelector(`.nav-btn[data-section="${targetSectionId}"]`);
+        if (activeButton) activeButton.classList.add('active');
 
         if (targetSectionId === 'profile') loadProfileData();
         if (targetSectionId === 'transactions') loadTransactions();
@@ -196,10 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Profile Section Logic ---
     async function loadProfileData() {
-        if (!currentUser || !currentUser.telegram_user_id) {
-            console.log("loadProfileData: currentUser or ID missing, skipping.");
-            return;
-        }
+        if (!currentUser || !currentUser.telegram_user_id) return;
         profileUsername.textContent = currentUser.telegram_username || 'N/A';
         profileTgId.textContent = currentUser.telegram_user_id;
         profileLinksCreated.textContent = currentUser.links_created_count || 0;
@@ -211,82 +189,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
     withdrawPointsBtn.addEventListener('click', () => {
         if (!currentUser || currentUser.total_points === undefined) {
-             showAlert("Profile data not loaded yet. Please wait.", "error", tg); return;
+             showAlert("Profile data not loaded.", "error", tg); return;
         }
         if (currentUser.total_points > 0) {
-            modalCurrentPoints.textContent = currentUser.total_points || 0; 
+            modalCurrentPoints.textContent = currentUser.total_points || 0;
             withdrawAmountInput.max = currentUser.total_points;
-            withdrawAmountInput.value = '';
-            withdrawDetailsInput.value = '';
-            withdrawMethodSelect.value = '';
-            withdrawMessage.textContent = '';
-            withdrawMessage.style.display = 'none';
+            withdrawAmountInput.value = ''; withdrawDetailsInput.value = ''; withdrawMethodSelect.value = '';
+            withdrawMessage.textContent = ''; withdrawMessage.style.display = 'none';
             withdrawModal.style.display = 'block';
         } else {
-            showAlert("You have no points to withdraw.", "info", tg);
+            showAlert("No points to withdraw.", "info", tg);
         }
     });
 
-    closeModalBtn.addEventListener('click', () => {
-        withdrawModal.style.display = 'none';
-    });
-
-    window.addEventListener('click', (event) => {
-        if (event.target == withdrawModal) {
-            withdrawModal.style.display = 'none';
-        }
-    });
+    closeModalBtn.addEventListener('click', () => withdrawModal.style.display = 'none');
+    window.addEventListener('click', (event) => { if (event.target == withdrawModal) withdrawModal.style.display = 'none'; });
 
     submitWithdrawalBtn.addEventListener('click', async () => {
         const points = parseInt(withdrawAmountInput.value);
         const method = withdrawMethodSelect.value;
         const details = withdrawDetailsInput.value.trim();
 
-        if (isNaN(points) || points <= 0) {
-            showWithdrawMessage("Please enter a valid number of points.", "error"); return;
-        }
-        if (points > currentUser.total_points) {
-            showWithdrawMessage("Insufficient points.", "error"); return;
-        }
-        if (!method) {
-            showWithdrawMessage("Please select a withdrawal method.", "error"); return;
-        }
-        if (!details) {
-            showWithdrawMessage("Please enter withdrawal details (e.g., UPI ID).", "error"); return;
-        }
+        if (isNaN(points) || points <= 0) { showWithdrawMessage("Invalid points.", "error"); return; }
+        if (points > currentUser.total_points) { showWithdrawMessage("Insufficient points.", "error"); return; }
+        if (!method) { showWithdrawMessage("Select withdrawal method.", "error"); return; }
+        if (!details) { showWithdrawMessage("Enter withdrawal details.", "error"); return; }
 
-        submitWithdrawalBtn.disabled = true;
-        submitWithdrawalBtn.textContent = 'Submitting...';
+        submitWithdrawalBtn.disabled = true; submitWithdrawalBtn.textContent = 'Submitting...';
         try {
             await db.collection('withdrawals').add({
-                telegram_user_id: currentUser.telegram_user_id,
-                telegram_username: currentUser.telegram_username,
-                points_withdrawn: points,
-                method: method,
-                details: details,
-                status: 'Pending',
+                telegram_user_id: currentUser.telegram_user_id, telegram_username: currentUser.telegram_username,
+                points_withdrawn: points, method: method, details: details, status: 'Pending',
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-
             await db.collection('users').doc(currentUser.telegram_user_id).update({
                 total_points: firebase.firestore.FieldValue.increment(-points)
             });
-            currentUser.total_points -= points; 
-
-            showWithdrawMessage("Withdrawal request submitted! It will be processed soon.", "success");
+            currentUser.total_points -= points;
+            showWithdrawMessage("Withdrawal request submitted!", "success");
             tg.HapticFeedback.notificationOccurred('success');
-            loadProfileData(); 
-            setTimeout(() => {
-                withdrawModal.style.display = 'none';
-            }, 2000);
-
+            loadProfileData();
+            setTimeout(() => withdrawModal.style.display = 'none', 2000);
         } catch (error) {
-            console.error("Error submitting withdrawal:", error);
-            showWithdrawMessage("Error submitting request. Please try again.", "error");
+            showWithdrawMessage("Error submitting request.", "error");
             tg.HapticFeedback.notificationOccurred('error');
         } finally {
-            submitWithdrawalBtn.disabled = false;
-            submitWithdrawalBtn.textContent = 'Submit Request';
+            submitWithdrawalBtn.disabled = false; submitWithdrawalBtn.textContent = 'Submit Request';
         }
     });
 
@@ -315,8 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (/(amazon\.in|amzn\.to|amazon\.com)/i.test(originalUrl)) {
                 platform = 'Amazon';
                 const url = new URL(originalUrl);
-                const paramsToRemove = ['tag', 'ascsubtag', 'creative', 'creativeASIN', 'linkCode', 'th', 'psc'];
-                paramsToRemove.forEach(param => url.searchParams.delete(param));
+                ['tag', 'ascsubtag', 'creative', 'creativeASIN', 'linkCode', 'th', 'psc'].forEach(param => url.searchParams.delete(param));
                 url.searchParams.set('tag', AMAZON_AFFILIATE_TAG);
                 generatedUrl = url.toString();
             } else if (/(flipkart\.com|dl\.flipkart\.com|myntra\.com|myntr\.it|ajio\.com|shopsy\.in|nykaa\.com)/i.test(originalUrl)) {
@@ -327,36 +274,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (/(nykaa\.com)/i.test(originalUrl)) platform = 'Nykaa';
                 else platform = 'EarnKaro_Other';
 
-                if (!EARNKARO_API_ENDPOINT) throw new Error("EarnKaro API endpoint not configured.");
+                if (!EARNKARO_API_ENDPOINT) throw new Error("EarnKaro API endpoint not configured in script.");
 
                 const response = await fetch(EARNKARO_API_ENDPOINT, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${EARNKARO_API_KEY}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${EARNKARO_API_KEY}` },
                     body: JSON.stringify({ url: originalUrl })
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: "Unknown API error" }));
+                if (!response.ok) { // This includes network errors that still return a response object (like 4xx, 5xx)
+                    const errorData = await response.json().catch(() => ({ message: `HTTP error! Status: ${response.status}` }));
                     throw new Error(`EarnKaro API Error (${response.status}): ${errorData.message || response.statusText}`);
                 }
                 const data = await response.json();
                 generatedUrl = data.affiliate_url || data.short_link || data.link;
-                if (!generatedUrl) throw new Error("EarnKaro API did not return a valid link.");
+                if (!generatedUrl) throw new Error("EarnKaro API response did not contain a valid link.");
+
             } else {
-                showLinkGenerationMessage("Unsupported URL. Use Amazon, Flipkart, Myntra, Ajio, Shopsy, or Nykaa.", "error");
-                generateLinkBtn.disabled = false;
-                return;
+                showLinkGenerationMessage("Unsupported URL. Use Amazon, Flipkart, Myntra, etc.", "error");
+                generateLinkBtn.disabled = false; return;
             }
 
             await db.collection('generated_links').add({
-                telegram_user_id: currentUser.telegram_user_id,
-                telegram_username: currentUser.telegram_username,
-                original_url: originalUrl,
-                generated_url: generatedUrl,
-                platform: platform,
+                telegram_user_id: currentUser.telegram_user_id, telegram_username: currentUser.telegram_username,
+                original_url: originalUrl, generated_url: generatedUrl, platform: platform,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             await db.collection('users').doc(currentUser.telegram_user_id).update({
@@ -372,7 +313,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error("Error generating link:", error);
-            showLinkGenerationMessage(`Error: ${error.message}`, "error");
+            let userFriendlyError = `Error: ${error.message}`;
+            if (error instanceof TypeError && error.message.toLowerCase() === 'failed to fetch') { // More specific check for CORS/Network
+                userFriendlyError = "Error: Failed to fetch. This might be a network issue, or the API server (EarnKaro) may not allow requests from this web app (CORS policy). Check EarnKaro's API documentation.";
+            } else if (error.message.includes("EarnKaro API Error")) { // Pass through API specific errors
+                userFriendlyError = error.message;
+            }
+            showLinkGenerationMessage(userFriendlyError, "error");
             tg.HapticFeedback.notificationOccurred('error');
         } finally {
             generateLinkBtn.disabled = false;
@@ -383,17 +330,12 @@ document.addEventListener('DOMContentLoaded', () => {
         generatedLinkOutput.select();
         try {
             document.execCommand('copy');
-            showLinkGenerationMessage("Link copied!", "success"); 
+            showLinkGenerationMessage("Link copied!", "success");
             tg.HapticFeedback.impactOccurred('medium');
-        } catch (err) {
-            showLinkGenerationMessage("Copy failed. Please copy manually.", "error");
-        }
-        setTimeout(() => {
-            if (linkGenerationMessage.classList.contains('success')) { 
-                 linkGenerationMessage.style.display = 'none';
-                 linkGenerationMessage.textContent = '';
-            }
-        }, 2000);
+        } catch (err) { showLinkGenerationMessage("Copy failed.", "error"); }
+        setTimeout(() => { if (linkGenerationMessage.classList.contains('success')) {
+            linkGenerationMessage.style.display = 'none'; linkGenerationMessage.textContent = '';
+        }}, 2000);
     });
 
     function showLinkGenerationMessage(message, type) {
@@ -405,121 +347,69 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Shopping Evidence Section Logic ---
     submitQuickOrderIdBtn.addEventListener('click', async () => {
         const orderId = quickOrderIdInput.value.trim();
-        if (!orderId) {
-            showQuickSubmitMessage("Please enter an Order ID.", "error"); return;
-        }
-        submitQuickOrderIdBtn.disabled = true;
-        submitQuickOrderIdBtn.textContent = 'Submitting...';
+        if (!orderId) { showQuickSubmitMessage("Enter Order ID.", "error"); return; }
+        submitQuickOrderIdBtn.disabled = true; submitQuickOrderIdBtn.textContent = 'Submitting...';
         try {
             await db.collection('order_proofs').add({
-                telegram_user_id: currentUser.telegram_user_id,
-                telegram_username: currentUser.telegram_username,
-                order_id: orderId,
-                submission_type: 'quick',
-                status: 'Pending',
-                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                points_awarded: 0
+                telegram_user_id: currentUser.telegram_user_id, telegram_username: currentUser.telegram_username,
+                order_id: orderId, submission_type: 'quick', status: 'Pending',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(), points_awarded: 0
             });
             await db.collection('users').doc(currentUser.telegram_user_id).update({
                 pending_orders_count: firebase.firestore.FieldValue.increment(1)
             });
             currentUser.pending_orders_count = (currentUser.pending_orders_count || 0) + 1;
-
-            showQuickSubmitMessage("Order ID received! Complete Google Form for reward.", "success");
+            showQuickSubmitMessage("Order ID received! Complete Google Form.", "success");
             quickOrderIdInput.value = '';
-            tg.HapticFeedback.notificationOccurred('success');
-            loadProfileData();
+            tg.HapticFeedback.notificationOccurred('success'); loadProfileData();
         } catch (error) {
-            console.error("Error submitting quick Order ID:", error);
-            showQuickSubmitMessage("Error submitting. Please try again.", "error");
+            showQuickSubmitMessage("Error submitting.", "error");
             tg.HapticFeedback.notificationOccurred('error');
         } finally {
-            submitQuickOrderIdBtn.disabled = false;
-            submitQuickOrderIdBtn.textContent = 'Submit Order ID';
+            submitQuickOrderIdBtn.disabled = false; submitQuickOrderIdBtn.textContent = 'Submit Order ID';
         }
     });
 
     copyGformLinkBtn.addEventListener('click', () => {
         googleFormLinkInput.select();
         try {
-            document.execCommand('copy');
-            showCopyGFormMessage("Google Form link copied!", "success");
+            document.execCommand('copy'); showCopyGFormMessage("Form link copied!", "success");
             tg.HapticFeedback.impactOccurred('medium');
-        } catch (err) {
-             showCopyGFormMessage("Copy failed. Please copy manually.", "error");
-        }
-        setTimeout(() => {
-            if (copyGformMessage.classList.contains('success')) {
-                 copyGformMessage.style.display = 'none';
-                 copyGformMessage.textContent = '';
-            }
-        }, 2000);
+        } catch (err) { showCopyGFormMessage("Copy failed.", "error"); }
+        setTimeout(() => { if (copyGformMessage.classList.contains('success')) {
+            copyGformMessage.style.display = 'none'; copyGformMessage.textContent = '';
+        }}, 2000);
     });
 
     function showQuickSubmitMessage(message, type) {
-        quickSubmitMessage.textContent = message;
-        quickSubmitMessage.className = `message ${type}`;
-        quickSubmitMessage.style.display = 'block';
+        quickSubmitMessage.textContent = message; quickSubmitMessage.className = `message ${type}`; quickSubmitMessage.style.display = 'block';
     }
     function showCopyGFormMessage(message, type) {
-        copyGformMessage.textContent = message;
-        copyGformMessage.className = `message ${type}`;
-        copyGformMessage.style.display = 'block';
+        copyGformMessage.textContent = message; copyGformMessage.className = `message ${type}`; copyGformMessage.style.display = 'block';
     }
 
     // --- Transactions Section Logic ---
     async function loadTransactions() {
         if (!currentUser || !currentUser.telegram_user_id) {
-             transactionsList.innerHTML = "<p>Please login or wait for profile to load.</p>";
-             return;
+             transactionsList.innerHTML = "<p>Profile not loaded.</p>"; return;
         }
-        transactionsList.innerHTML = '<div class="spinner-small" style="margin: 20px auto;"></div> <p style="text-align: center;">Loading activity...</p>';
+        transactionsList.innerHTML = '<div class="spinner-small" style="margin:20px auto;"></div><p style="text-align:center;">Loading...</p>';
         try {
-            const selectedStatus = statusFilter.value;
-            let combinedTransactions = [];
-
-            const linksQuery = db.collection('generated_links')
-                .where('telegram_user_id', '==', currentUser.telegram_user_id)
-                .orderBy('timestamp', 'desc').limit(50); 
+            const selectedStatus = statusFilter.value; let combinedTransactions = [];
+            const linksQuery = db.collection('generated_links').where('telegram_user_id', '==', currentUser.telegram_user_id).orderBy('timestamp', 'desc').limit(50);
             const linksSnapshot = await linksQuery.get();
-            linksSnapshot.forEach(doc => {
-                const data = doc.data();
-                combinedTransactions.push({
-                    type: 'Link Generated', id: doc.id,
-                    details: `Original: ${truncateString(data.original_url, 30)} <br> Generated: ${truncateString(data.generated_url, 30)}`,
-                    platform: data.platform, status: 'N/A', points: 0,
-                    timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
-                });
-            });
+            linksSnapshot.forEach(doc => { const d = doc.data(); combinedTransactions.push({ type: 'Link Generated', id: doc.id, details: `Orig: ${truncateString(d.original_url,30)}<br>Gen: ${truncateString(d.generated_url,30)}`, platform: d.platform, status: 'N/A', points: 0, timestamp: d.timestamp ? d.timestamp.toDate() : new Date() }); });
 
-            let proofsQuery = db.collection('order_proofs')
-                .where('telegram_user_id', '==', currentUser.telegram_user_id);
-            if (selectedStatus !== 'all') {
-                proofsQuery = proofsQuery.where('status', '==', selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1)); 
-            }
-             proofsQuery = proofsQuery.orderBy('timestamp', 'desc').limit(50);
-
+            let proofsQuery = db.collection('order_proofs').where('telegram_user_id', '==', currentUser.telegram_user_id);
+            if (selectedStatus !== 'all') proofsQuery = proofsQuery.where('status', '==', selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1));
+            proofsQuery = proofsQuery.orderBy('timestamp', 'desc').limit(50);
             const proofsSnapshot = await proofsQuery.get();
-            proofsSnapshot.forEach(doc => {
-                const data = doc.data();
-                combinedTransactions.push({
-                    type: 'Order Proof', id: doc.id,
-                    details: `Order ID: ${data.order_id}`, status: data.status,
-                    points: data.points_awarded || 0,
-                    timestamp: data.timestamp ? data.timestamp.toDate() : new Date()
-                });
-            });
-
+            proofsSnapshot.forEach(doc => { const d = doc.data(); combinedTransactions.push({ type: 'Order Proof', id: doc.id, details: `Order ID: ${d.order_id}`, status: d.status, points: d.points_awarded || 0, timestamp: d.timestamp ? d.timestamp.toDate() : new Date() }); });
             combinedTransactions.sort((a, b) => b.timestamp - a.timestamp);
-
-            if (combinedTransactions.length === 0) {
-                transactionsList.innerHTML = "<p>No activity yet. Start creating links or submitting proofs!</p>";
-                return;
-            }
+            if (combinedTransactions.length === 0) { transactionsList.innerHTML = "<p>No activity yet.</p>"; return; }
             renderTransactions(combinedTransactions);
         } catch (error) {
-            console.error("Error loading transactions:", error);
-            transactionsList.innerHTML = "<p class='message error'>Could not load activity. Try again later.</p>";
+            transactionsList.innerHTML = "<p class='message error'>Could not load activity.</p>";
             tg.HapticFeedback.notificationOccurred('error');
         }
     }
@@ -536,15 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 else if (tx.status.toLowerCase() === 'successful' || tx.status.toLowerCase() === 'approved') statusEmoji = '🟢';
                 else if (tx.status.toLowerCase() === 'rejected') statusEmoji = '❌';
             }
-
-            item.innerHTML = `
-                <p><strong>Type:</strong> ${tx.type}</p>
-                <p><strong>Details:</strong> ${tx.details}</p>
-                ${tx.platform ? `<p><strong>Platform:</strong> ${tx.platform}</p>` : ''}
-                ${tx.status !== 'N/A' ? `<p><strong>Status:</strong> <span class="status-tag status-${statusClass}">${statusEmoji} ${tx.status}</span></p>` : ''}
-                ${tx.points > 0 ? `<p><strong>Points Earned:</strong> ${tx.points} ✨</p>` : ''}
-                <p class="timestamp">${tx.timestamp.toLocaleString()}</p>
-            `;
+            item.innerHTML = `<p><strong>Type:</strong> ${tx.type}</p><p><strong>Details:</strong> ${tx.details}</p>${tx.platform ? `<p><strong>Platform:</strong> ${tx.platform}</p>` : ''}${tx.status !== 'N/A' ? `<p><strong>Status:</strong> <span class="status-tag status-${statusClass}">${statusEmoji} ${tx.status}</span></p>` : ''}${tx.points > 0 ? `<p><strong>Points Earned:</strong> ${tx.points} ✨</p>` : ''}<p class="timestamp">${tx.timestamp.toLocaleString()}</p>`;
             transactionsList.appendChild(item);
         });
     }
@@ -553,31 +435,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Utility Functions ---
     function showAlert(message, type = 'info', tgInstance = null) {
-        const activeSection = document.querySelector('.section.active');
-        let msgDiv = null;
+        const activeSection = document.querySelector('.section.active'); let msgDiv = null;
         if (activeSection && activeSection.id === 'shop') msgDiv = linkGenerationMessage;
-        
-        if (msgDiv) {
-            msgDiv.textContent = message;
-            msgDiv.className = `message ${type}`;
-            msgDiv.style.display = 'block';
-            setTimeout(() => { if(type !== 'error') msgDiv.style.display = 'none'; }, 3000);
-        } else {
-            alert(`${type.toUpperCase()}: ${message}`);
-        }
-
-        if (tgInstance && tgInstance.HapticFeedback) {
-            if (type === 'success') tgInstance.HapticFeedback.notificationOccurred('success');
-            else if (type === 'error') tgInstance.HapticFeedback.notificationOccurred('error');
-            else tgInstance.HapticFeedback.impactOccurred('light');
-        }
+        if (msgDiv) { msgDiv.textContent = message; msgDiv.className = `message ${type}`; msgDiv.style.display = 'block'; setTimeout(() => { if(type !== 'error') msgDiv.style.display = 'none'; }, 3000); }
+        else { alert(`${type.toUpperCase()}: ${message}`); }
+        if (tgInstance && tgInstance.HapticFeedback) { if (type === 'success') tgInstance.HapticFeedback.notificationOccurred('success'); else if (type === 'error') tgInstance.HapticFeedback.notificationOccurred('error'); else tgInstance.HapticFeedback.impactOccurred('light'); }
     }
-
-    function truncateString(str, num) {
-        if (!str) return '';
-        if (str.length <= num) return str;
-        return str.slice(0, num) + '...';
-    }
+    function truncateString(str, num) { if (!str) return ''; if (str.length <= num) return str; return str.slice(0, num) + '...'; }
 
     // --- Start the app ---
     initializeApp();
