@@ -276,13 +276,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (!EARNKARO_API_ENDPOINT) throw new Error("EarnKaro API endpoint not configured in script.");
 
-                const response = await fetch(EARNKARO_API_ENDPOINT, {
-                    method: 'POST',
+                // This is the fetch call that is likely failing due to CORS or incorrect API details
+                const response = await fetch(EARNKARO_API_ENDPOINT, { 
+                    method: 'POST', 
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${EARNKARO_API_KEY}` },
-                    body: JSON.stringify({ url: originalUrl })
+                    body: JSON.stringify({ url: originalUrl }) 
                 });
 
-                if (!response.ok) { // This includes network errors that still return a response object (like 4xx, 5xx)
+                if (!response.ok) { 
                     const errorData = await response.json().catch(() => ({ message: `HTTP error! Status: ${response.status}` }));
                     throw new Error(`EarnKaro API Error (${response.status}): ${errorData.message || response.statusText}`);
                 }
@@ -314,9 +315,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Error generating link:", error);
             let userFriendlyError = `Error: ${error.message}`;
-            if (error instanceof TypeError && error.message.toLowerCase() === 'failed to fetch') { // More specific check for CORS/Network
+            // This 'if' condition specifically creates the detailed error message you are seeing
+            if (error instanceof TypeError && error.message.toLowerCase() === 'failed to fetch') { 
                 userFriendlyError = "Error: Failed to fetch. This might be a network issue, or the API server (EarnKaro) may not allow requests from this web app (CORS policy). Check EarnKaro's API documentation.";
-            } else if (error.message.includes("EarnKaro API Error")) { // Pass through API specific errors
+            } else if (error.message.includes("EarnKaro API Error")) { 
                 userFriendlyError = error.message;
             }
             showLinkGenerationMessage(userFriendlyError, "error");
